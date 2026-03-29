@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberHorizon TI — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg:       #0a0c0f;
+    --bg2:      #111318;
+    --bg3:      #181c23;
+    --border:   rgba(255,255,255,0.07);
+    --border2:  rgba(255,255,255,0.13);
+    --text:     #e8e6df;
+    --muted:    #6b6d72;
+    --accent:   #00e5a0;
+    --crit:     #ff4d4d;
+    --high:     #ff9a3c;
+    --med:      #4d9fff;
+    --low:      #4ddb8a;
+    --poison:   #c97aff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--text); }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.8); }
+  }
+  .status-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #report-selector {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    outline: none;
+  }
+  #report-selector:focus { border-color: var(--accent); }
+
+  /* ── MAIN LAYOUT ── */
+  .main { padding: 28px 32px; }
+
+  /* ── REPORT HEADER ── */
+  .report-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .report-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(0,229,160,0.08);
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+  .report-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── KPI GRID ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--kpi-color, var(--accent));
+  }
+  .kpi-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .kpi-val {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--kpi-color, var(--text));
+    line-height: 1;
+  }
+  .kpi-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── GRID 2 COLS ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+  }
+  .card-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title::before {
+    content: '';
+    display: inline-block;
+    width: 3px; height: 12px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  /* ── BAR CHART ── */
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .bar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    width: 90px;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+  .bar-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 24px;
+    text-align: right;
+  }
+
+  /* ── IOC TABLE ── */
+  .ioc-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    font-size: 12px;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .val-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .badge-CRITICAL { background: rgba(255,77,77,0.15);  color: var(--crit); }
+  .badge-HIGH     { background: rgba(255,154,60,0.15); color: var(--high); }
+  .badge-MEDIUM   { background: rgba(77,159,255,0.15); color: var(--med);  }
+  .badge-LOW      { background: rgba(77,219,138,0.15); color: var(--low);  }
+  .badge-type     { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+  /* ── SOC RECS ── */
+  .rec-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 7px;
+    margin-bottom: 7px;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+  }
+  .rec-URGENT  { background: rgba(255,77,77,0.08);   border-color: var(--crit);   color: #ffaaaa; }
+  .rec-ALERT   { background: rgba(255,154,60,0.08);  border-color: var(--high);   color: #ffd0aa; }
+  .rec-MONITOR { background: rgba(77,159,255,0.08);  border-color: var(--med);    color: #aaccff; }
+  .rec-WARNING { background: rgba(201,122,255,0.08); border-color: var(--poison); color: #e0aaff; }
+  .rec-default { background: rgba(0,229,160,0.06);   border-color: var(--accent); color: #aaffd8; }
+
+  /* ── MITRE TABLE ── */
+  .mitre-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .mitre-row:last-child { border-bottom: none; }
+  .mitre-tech { color: var(--text); }
+  .mitre-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(0,229,160,0.08);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── HISTORY PANEL ── */
+  .history-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .hist-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .hist-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .hist-chip.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* ── EMPTY / ERROR STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state .icon { font-size: 40px; margin-bottom: 16px; opacity: 0.4; }
+  .empty-state p { font-size: 14px; }
+  .empty-state code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── CANVAS ── */
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .main { padding: 16px; }
+    .topbar { padding: 14px 16px; }
+  }
+  @media (max-width: 600px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">Cyber<span>Horizon</span> TI</div>
+  <div class="topbar-right">
+    <div class="live-dot"></div>
+    <span class="status-text" id="last-update">Chargement...</span>
+    <select id="report-selector" onchange="loadReport(this.value)">
+      <option value="">Sélectionner un rapport...</option>
+    </select>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main" id="main-content">
+  <div class="empty-state">
+    <div class="icon">⚡</div>
+    <p>Chargement des rapports depuis <code>../reports/</code>…</p>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIGURATION
+// Chemins des fichiers JSON à charger.
+// Le dashboard scanne automatiquement ces fichiers.
+// ══════════════════════════════════════════
+
+// Liste des rapports disponibles — mise à jour automatique
+// via le manifest.json généré par le pipeline.
+// Fallback : scan manuel si manifest absent.
+const REPORTS_PATH = '../reports/';
+const MANIFEST     = '../reports/manifest.json';
+
+let allReports  = [];   // historique complet
+let activeReport = null;
+let charts      = {};
+
+// ══════════════════════════════════════════
+// INIT — Charger le manifest ou scanner
+// ══════════════════════════════════════════
+
+async function init() {
+  try {
+    // Tente de charger le manifest (liste des fichiers JSON)
+    const res = await fetch(MANIFEST);
+    if (res.ok) {
+      const manifest = await res.json();
+      await loadAllReports(manifest.files);
+    } else {
+      showManifestError();
+    }
+  } catch (e) {
+    showManifestError();
+  }
+}
+
+function showManifestError() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">📂</div>
+      <p style="margin-bottom:12px">Aucun manifest trouvé. Ajoutez <code>generate_manifest()</code> à votre pipeline.</p>
+      <p style="font-size:12px;color:var(--muted)">Ou glissez-déposez vos fichiers JSON ci-dessous.</p>
+      <div id="drop-zone" style="margin-top:20px;border:2px dashed var(--border2);border-radius:10px;padding:30px;cursor:pointer;transition:border-color 0.2s"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+           ondragleave="this.style.borderColor='var(--border2)'"
+           ondrop="handleDrop(event)">
+        <p style="font-size:13px">Cliquez ou glissez vos fichiers <code>TI_report_*.json</code> ici</p>
+      </div>
+      <input type="file" id="file-input" multiple accept=".json" style="display:none" onchange="handleFiles(this.files)">
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+// CHARGEMENT DES RAPPORTS
+// ══════════════════════════════════════════
+
+async function loadAllReports(files) {
+  const loaded = [];
+  for (const file of files) {
+    try {
+      const res = await fetch(REPORTS_PATH + file);
+      if (res.ok) {
+        const data = await res.json();
+        data._filename = file;
+        loaded.push(data);
+      }
+    } catch (e) { /* skip */ }
+  }
+  if (!loaded.length) { showManifestError(); return; }
+
+  // Trier par date (plus récent en premier)
+  loaded.sort((a, b) => new Date(b.generated_at) - new Date(a.generated_at));
+  allReports = loaded;
+
+  populateSelector();
+  loadReport(loaded[0]._filename);
+}
+
+function populateSelector() {
+  const sel = document.getElementById('report-selector');
+  sel.innerHTML = '';
+  allReports.forEach((r, i) => {
+    const opt = document.createElement('option');
+    opt.value = r._filename;
+    const d = new Date(r.generated_at);
+    opt.textContent = `${r.report_id} — ${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})}`;
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('last-update').textContent =
+    `${allReports.length} rapport(s) · Dernier : ${new Date(allReports[0].generated_at).toLocaleString('fr-FR')}`;
+}
+
+function loadReport(filename) {
+  const report = allReports.find(r => r._filename === filename);
+  if (!report) return;
+  activeReport = report;
+  renderDashboard(report);
+}
+
+// ══════════════════════════════════════════
+// DRAG & DROP (mode sans serveur)
+// ══════════════════════════════════════════
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--border2)';
+  handleFiles(e.dataTransfer.files);
+}
+
+function handleFiles(files) {
+  const readers = Array.from(files).map(file => new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        data._filename = file.name;
+        res(data);
+      } catch { res(null); }
+    };
+    r.readAsText(file);
+  }));
+  Promise.all(readers).then(results => {
+    const valid = results.filter(Boolean);
+    if (!valid.length) return;
+    valid.sort((a,b) => new Date(b.generated_at) - new Date(a.generated_at));
+    allReports = valid;
+    populateSelector();
+    loadReport(valid[0]._filename);
+  });
+}
+
+// ══════════════════════════════════════════
+// RENDER DASHBOARD
+// ══════════════════════════════════════════
+
+function renderDashboard(r) {
+  const s   = r.summary;
+  const d   = new Date(r.generated_at);
+
+  // Détruire les charts précédents
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  const html = `
+    <!-- Report header -->
+    <div class="report-header">
+      <div>
+        <span class="report-id">${r.report_id}</span>
+        <span style="margin-left:12px;font-size:12px;color:var(--muted)">${r.pipeline}</span>
+      </div>
+      <div class="report-date">${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR')}</div>
+    </div>
+
+    <!-- History chips -->
+    <div class="history-bar" id="hist-chips"></div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi" style="--kpi-color:var(--accent)">
+        <div class="kpi-label">IOCs collectés</div>
+        <div class="kpi-val">${s.total_collected}</div>
+        <div class="kpi-sub">${s.sources_used.join(' · ')}</div>
+      </div>
+      <div class="kpi" style="--kpi-color:var(--low)">
+        <div class="kpi-label">IOCs propres</div>
+        <div class="kpi-val">${s.total_clean}</div>
+        <div class="kpi-sub">${pct(s.total_clean, s.total_collected)}% du total</div>
+      </div>
+      <div class="kpi" style="--kpi-color:var(--high)">
+        <div class="kpi-label">Bruit filtré</div>
+        <div class="kpi-val">${s.total_noise_filtered}</div>
+        <div class="kpi-sub">${s.noise_ratio_pct}% du total</div>
+      </div>
+      <div class="kpi" style="--kpi-color:var(--poison)">
+        <div class="kpi-label">Poisoning</div>
+        <div class="kpi-val">${s.total_poisoning_flagged}</div>
+        <div class="kpi-sub">Vérification manuelle</div>
+      </div>
+      <div class="kpi" style="--kpi-color:var(--crit)">
+        <div class="kpi-label">CRITICAL</div>
+        <div class="kpi-val">${s.severity_breakdown.CRITICAL || 0}</div>
+        <div class="kpi-sub">Bloquer immédiatement</div>
+      </div>
+    </div>
+
+    <!-- Row 1 : doughnut + familles + pays -->
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">Sévérité</div>
+        <div class="chart-wrap"><canvas id="sevChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top familles de malware</div>
+        ${buildBars(r.top_malware_families, 'family', [
+          '#ff4d4d','#ff9a3c','#ffd24d','#4ddb8a','#4d9fff','#c97aff','#00e5a0','#ff6b9d'
+        ])}
+      </div>
+      <div class="card">
+        <div class="card-title">Top pays (C2 IPs)</div>
+        ${buildBars(r.top_countries, 'country', [
+          '#ff4d4d','#ff9a3c','#ffd24d','#4ddb8a','#4d9fff','#c97aff','#00e5a0','#ff6b9d'
+        ])}
+      </div>
+    </div>
+
+    <!-- Row 2 : MITRE + sources + SOC -->
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">MITRE ATT&CK observé</div>
+        ${buildMitre(r.mitre_techniques_observed || [])}
+      </div>
+      <div class="card">
+        <div class="card-title">Sources OSINT</div>
+        ${buildSourceBars(r.sources_breakdown)}
+        <div style="margin-top:16px">
+          <div class="chart-wrap" style="height:140px"><canvas id="srcChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recommandations SOC</div>
+        ${buildRecs(r.soc_recommendations)}
+      </div>
+    </div>
+
+    <!-- IOC Table -->
+    <div class="card">
+      <div class="card-title">IOCs CRITICAL &amp; HIGH
+        <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);font-weight:400">
+          ${r.critical_iocs.length} entrées
+        </span>
+      </div>
+      <div class="ioc-table-wrap">
+        ${buildIocTable(r.critical_iocs)}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('main-content').innerHTML = html;
+
+  // Render charts
+  renderSevChart(s.severity_breakdown);
+  renderSrcChart(r.sources_breakdown);
+  renderHistChips();
+}
+
+// ══════════════════════════════════════════
+// BUILDERS
+// ══════════════════════════════════════════
+
+function buildBars(items, key, colors) {
+  if (!items || !items.length)
+    return '<p style="font-size:12px;color:var(--muted)">Aucune donnée</p>';
+  const max = items[0].count || 1;
+  return items.slice(0, 8).map((item, i) => `
+    <div class="bar-row">
+      <span class="bar-label">${item[key]}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.round(item.count/max*100)}%;background:${colors[i % colors.length]}"></div>
+      </div>
+      <span class="bar-count">${item.count}</span>
+    </div>`).join('');
+}
+
+function buildSourceBars(src) {
+  const colors = { 'MalwareBazaar': '#4ddb8a', 'URLhaus': '#4d9fff', 'Feodo Tracker': '#c97aff' };
+  const total  = Object.values(src).reduce((a,b) => a+b, 0) || 1;
+  return Object.entries(src).map(([name, count]) => `
+    <div class="bar-row">
+      <span class="bar-label" style="width:110px">${name}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.round(count/total*100)}%;background:${colors[name]||'#888'}"></div>
+      </div>
+      <span class="bar-count">${count}</span>
+    </div>`).join('');
+}
+
+function buildMitre(items) {
+  if (!items.length)
+    return '<p style="font-size:12px;color:var(--muted)">Aucune technique détectée — activez map_mitre() dans le pipeline</p>';
+  return items.slice(0, 8).map(item => `
+    <div class="mitre-row">
+      <span class="mitre-tech">${item.technique}</span>
+      <span class="mitre-count">${item.count}</span>
+    </div>`).join('');
+}
+
+function buildRecs(recs) {
+  return recs.map(rec => {
+    const key = rec.split(':')[0].split(' ')[0];
+    const cls = ['URGENT','ALERT','MONITOR','WARNING'].includes(key) ? `rec-${key}` : 'rec-default';
+    return `<div class="rec-item ${cls}">${rec}</div>`;
+  }).join('');
+}
+
+function buildIocTable(iocs) {
+  if (!iocs.length)
+    return '<p style="font-size:12px;color:var(--muted);padding:16px 0">Aucun IOC CRITICAL/HIGH</p>';
+  const rows = iocs.slice(0, 50).map(ioc => {
+    const val = String(ioc.value);
+    const disp = val.length > 45 ? val.slice(0,45)+'…' : val;
+    const mitre = (ioc.mitre||[]).slice(0,2).join(', ') || '—';
+    return `<tr>
+      <td class="val-cell" title="${val}">${disp}</td>
+      <td><span class="badge badge-type">${ioc.type}</span></td>
+      <td style="font-size:11px">${ioc.source}</td>
+      <td style="font-size:11px">${ioc.family}</td>
+      <td style="font-size:11px">${ioc.geo||'—'}</td>
+      <td style="font-weight:700;font-size:13px;color:${scoreColor(ioc.score)}">${ioc.score}</td>
+      <td><span class="badge badge-${ioc.severity}">${ioc.severity}</span></td>
+      <td style="font-size:10px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mitre}</td>
+      <td class="mono">${ioc.vt_detections}/${ioc.vt_total||'—'}</td>
+      <td class="mono">${ioc.abuse_confidence!=null?ioc.abuse_confidence+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+  return `<table>
+    <thead><tr>
+      <th>Valeur</th><th>Type</th><th>Source</th><th>Famille</th>
+      <th>Pays</th><th>Score</th><th>Sévérité</th>
+      <th>MITRE ATT&CK</th><th>VT</th><th>AbuseIPDB</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderHistChips() {
+  const el = document.getElementById('hist-chips');
+  if (!el || allReports.length < 2) return;
+  el.innerHTML = allReports.map(r => {
+    const d = new Date(r.generated_at);
+    const label = `${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
+    const active = r._filename === activeReport._filename ? 'active' : '';
+    return `<span class="hist-chip ${active}" onclick="selectFromChip('${r._filename}',this)">${label}</span>`;
+  }).join('');
+}
+
+function selectFromChip(filename, el) {
+  document.querySelectorAll('.hist-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('report-selector').value = filename;
+  loadReport(filename);
+}
+
+// ══════════════════════════════════════════
+// CHARTS
+// ══════════════════════════════════════════
+
+function renderSevChart(sev) {
+  const ctx = document.getElementById('sevChart');
+  if (!ctx) return;
+  charts.sev = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['CRITICAL','HIGH','MEDIUM','LOW'],
+      datasets: [{
+        data: [sev.CRITICAL||0, sev.HIGH||0, sev.MEDIUM||0, sev.LOW||0],
+        backgroundColor: ['#ff4d4d','#ff9a3c','#4d9fff','#4ddb8a'],
+        borderWidth: 0,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#6b6d72',
+            font: { size: 11, family: 'JetBrains Mono' },
+            padding: 10,
+            boxWidth: 10,
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderSrcChart(src) {
+  const ctx = document.getElementById('srcChart');
+  if (!ctx) return;
+  const colors = { 'MalwareBazaar':'#4ddb8a','URLhaus':'#4d9fff','Feodo Tracker':'#c97aff' };
+  charts.src = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(src),
+      datasets: [{
+        data: Object.values(src),
+        backgroundColor: Object.keys(src).map(k => colors[k]||'#888'),
+        borderRadius: 4,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#6b6d72', font:{ size:10, family:'JetBrains Mono' } }, grid:{ color:'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color:'#6b6d72', font:{ size:10, family:'JetBrains Mono' } }, grid:{ color:'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════
+
+function pct(a, b) { return b ? Math.round(a/b*100) : 0; }
+
+function scoreColor(s) {
+  if (s >= 80) return 'var(--crit)';
+  if (s >= 60) return 'var(--high)';
+  if (s >= 40) return 'var(--med)';
+  return 'var(--low)';
+}
+
+// ══════════════════════════════════════════
+// AUTO-REFRESH toutes les 30s
+// ══════════════════════════════════════════
+setInterval(() => { init(); }, 30000);
+
+// DÉMARRAGE
+init();
+</script>
+</body>
+</html>
